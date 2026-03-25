@@ -40,7 +40,7 @@ const GetProductsComponent = () => {
 
     return (
         <div className="row">
-            <h3>Available products</h3>
+            <h3 className="text-success text-center">Available products</h3>
             <h6 className="text-warning">{loading}</h6>
             <h6 className="text-danger">{error}</h6>
 

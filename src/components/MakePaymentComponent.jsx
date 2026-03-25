@@ -43,7 +43,7 @@ const MakePaymentComponent = () => {
 
     return (
         <div className="row justify-content-center mt-4">
-            <h2>LIPA NA MPESA</h2>
+            <h3 className="text-center text-success">LIPA NA MPESA</h3>
             <div className="col-md-3">
                 <img 
                 src={img_url+product.product_image} 
