@@ -1,97 +1,286 @@
 import axios from "axios";
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const MakePaymentComponent = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    const { product } = useLocation().state || {}
+    // SUPPORT BOTH SINGLE PRODUCT + CART
+    const product = location.state?.product;
+    const cart = location.state?.cart || [];
 
-    const img_url = "https://onyi.alwaysdata.net/static/images/"
+    const img_url = "https://onyi.alwaysdata.net/static/images/";
 
-    let[phone, setPhone]=useState("")
-    let[loading, setLoading]=useState("")
-    let[error, setError]=useState("")
-    let[success, setSuccess]=useState("")
+    const [phone, setPhone] = useState("");
+    const [loading, setLoading] = useState("");
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
 
-    const handleSubmit = async(e)=>{
-        e.preventDefault()
-        setError("")
-        setSuccess("")
-        setLoading("Please wait...")
+    // DETERMINE MODE
+    const isCart = cart.length > 0;
+
+    // TOTAL CALCULATION
+    const total = isCart
+        ? cart.reduce(
+            (sum, item) =>
+                sum + item.product_cost * item.quantity,
+            0
+        )
+        : product?.product_cost || 0;
+
+    // HANDLE PAYMENT
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        setSuccess("");
+        setLoading("Processing payment...");
 
         try {
-            const data = new FormData()
+            const data = new FormData();
+            data.append("amount", total);
+            data.append("phone", phone);
 
-            data.append("amount", product.product_cost)
-            data.append("phone", phone)
+            const response = await axios.post(
+                "https://onyi.alwaysdata.net/api/mpesa_payment",
+                data
+            );
 
-            const response = await axios.post("https://onyi.alwaysdata.net/api/mpesa_payment", data)
-            console.log(response)
+            if (response.status === 200) {
+                setLoading("");
+                setSuccess(response.data.message);
+                setPhone("");
 
-            if(response.status  === 200 ){
-                setLoading("")
-                setSuccess(response.data.message)
-                setPhone("")
+                setTimeout(() => {
+                    navigate("/");
+                }, 2000);
             }
-
         } catch (error) {
-            setLoading("")
-            setError(error.message)
+            setLoading("");
+            setError(
+                error.response?.data?.message ||
+                error.message ||
+                "Payment failed"
+            );
         }
+    };
+
+    // NO PRODUCT OR CART
+    if (!product && cart.length === 0) {
+        return (
+            <div className="container py-5">
+                <div className="alert alert-danger text-center">
+                    <h4>❌ No items selected</h4>
+                    <p>Please add items to cart or select a product.</p>
+                </div>
+            </div>
+        );
     }
 
-
     return (
-        <div className="row justify-content-center mt-4">
-            <h3 className="text-center text-success">LIPA NA MPESA</h3>
-            <div className="col-md-3">
-                <img 
-                src={img_url+product.product_image} 
-                alt="" 
-                className="rounded img-thumbnail" />
+        <div
+            className="container-fluid py-5"
+            style={{
+                backgroundColor: "#f8f9fa",
+                minHeight: "100vh",
+            }}
+        >
+            <div className="container">
+                <h2 className="text-center fw-bold mb-5 text-primary">
+                    💳 LIPA NA MPESA
+                </h2>
+
+                <div className="row g-4 justify-content-center">
+
+                    {/* LEFT SIDE - PRODUCT / CART */}
+                    <div className="col-md-5">
+
+                        <div className="card shadow-lg border-0 p-4">
+
+                            {/* CART VIEW */}
+                            {isCart ? (
+                                <>
+                                    <h5 className="fw-bold mb-3">
+                                        🛒 Cart Items
+                                    </h5>
+
+                                    {cart.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className="border-bottom py-2"
+                                        >
+                                            <div className="d-flex justify-content-between">
+                                                <span>
+                                                    {item.product_name}
+                                                </span>
+
+                                                <span className="fw-bold">
+                                                    KSh{" "}
+                                                    {(
+                                                        item.product_cost *
+                                                        item.quantity
+                                                    ).toLocaleString()}
+                                                </span>
+                                            </div>
+
+                                            <small className="text-muted">
+                                                Qty: {item.quantity}
+                                            </small>
+                                        </div>
+                                    ))}
+                                </>
+                            ) : (
+                                // SINGLE PRODUCT VIEW
+                                <>
+                                    <img
+                                        src={
+                                            img_url +
+                                            product.product_image
+                                        }
+                                        alt={
+                                            product.product_name
+                                        }
+                                        className="rounded img-fluid mb-3"
+                                        style={{
+                                            height: "300px",
+                                            objectFit:
+                                                "cover",
+                                        }}
+                                    />
+
+                                    <h5 className="fw-bold text-dark">
+                                        {product.product_name}
+                                    </h5>
+
+                                    <p className="badge bg-primary mb-2">
+                                        {product.product_category}
+                                    </p>
+
+                                    <p className="text-muted small mb-3">
+                                        {
+                                            product.product_description
+                                        }
+                                    </p>
+                                </>
+                            )}
+
+                            <hr />
+
+                            <div className="d-flex justify-content-between align-items-center">
+                                <span className="text-muted">
+                                    Total Amount:
+                                </span>
+
+                                <h4 className="text-success fw-bold mb-0">
+                                    Ksh{" "}
+                                    {total.toLocaleString()}
+                                </h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT SIDE - PAYMENT */}
+                    <div className="col-md-5">
+                        <div className="card shadow-lg border-0 p-4">
+
+                            <h5 className="fw-bold mb-4">
+                                📱 Payment Details
+                            </h5>
+
+                            {/* STATUS */}
+                            {loading && (
+                                <div className="alert alert-warning">
+                                    ⏳ {loading}
+                                </div>
+                            )}
+
+                            {error && (
+                                <div className="alert alert-danger">
+                                    ❌ {error}
+                                </div>
+                            )}
+
+                            {success && (
+                                <div className="alert alert-success">
+                                    ✅ {success}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSubmit}>
+
+                                {/* AMOUNT */}
+                                <div className="mb-3">
+                                    <label className="form-label fw-bold">
+                                        Amount (Ksh)
+                                    </label>
+
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        value={total}
+                                        readOnly
+                                    />
+                                </div>
+
+                                {/* PHONE */}
+                                <div className="mb-3">
+                                    <label className="form-label fw-bold">
+                                        M-Pesa Phone Number
+                                    </label>
+
+                                    <input
+                                        type="tel"
+                                        className="form-control"
+                                        placeholder="254xxxxxxxxx"
+                                        required
+                                        value={phone}
+                                        onChange={(e) =>
+                                            setPhone(
+                                                e.target.value
+                                            )
+                                        }
+                                    />
+
+                                    <small className="text-muted">
+                                        Format: 254712345678
+                                    </small>
+                                </div>
+
+                                {/* BUTTON */}
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary w-100 fw-bold"
+                                    disabled={
+                                        loading !== "" ||
+                                        !phone
+                                    }
+                                >
+                                    💰 Pay Now
+                                </button>
+
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-secondary w-100 mt-2"
+                                    onClick={() =>
+                                        navigate(-1)
+                                    }
+                                >
+                                    ← Go Back
+                                </button>
+                            </form>
+
+                            <div className="alert alert-info mt-4">
+                                <strong>Secure Payment:</strong>{" "}
+                                Powered by M-Pesa STK Push
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
             </div>
-
-
-            <div className="col-md-3">
-                <h3 className="text-dark">{product.product_name}</h3>
-                <h5 className="text-primary">{product.product_category}</h5>
-                <p className="text-muted">{product.product_description}</p>
-                <h3 className="text-warning">{product.product_cost}</h3>
-
-                <hr />
-                <h6 className="text-warning">{loading}</h6>
-                <h6 className="text-danger">{error}</h6>
-                <h6 className="text-success">{success}</h6>
-
-
-                <form onSubmit={handleSubmit}> 
-                    <input type="text" 
-                    className="form-control"
-                    placeholder="Enter amount" 
-                    readOnly
-                    value={product.product_cost}/>
-                    <br />
-
-
-                    <input 
-                    type ="tel" 
-                    className="form-control" 
-                    placeholder="Enter Mpesa no 254xxxxxxxxxx"
-                    onChange={(e)=>{setPhone(e.target.value)}}
-                    value={phone}
-                    />
-                    <br />
-
-                    <button className="btn btn-dark">Pay now</button>
-
-                </form>
-
-            
-
-            </div>
-
         </div>
+    );
+};
 
-    )
-}
 export default MakePaymentComponent;
